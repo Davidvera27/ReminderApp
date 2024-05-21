@@ -1,0 +1,590 @@
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, ImageBackground, Image, TextInput, Button, Modal, Alert } from 'react-native';
+import * as Animatable from 'react-native-animatable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
+import { format } from 'date-fns';
+// Importar DateTimePicker
+import DateTimePicker from '@react-native-community/datetimepicker'; // Asegúrate de haber instalado este paquete
+
+
+const initialVehicles = [
+  { id: '1', brand: 'Audi', model: 'Q7', plate: 'IEU-480', type: 'CAMIONETA', color: 'BLANCO GLACIAR METALIZADO', logo: require('./assets/AUDI_Q7.png'), reminders: [] },
+  { id: '2', brand: 'Audi', model: 'A4', plate: 'HXW-528', type: 'AUTOMÓVIL', color: 'GRIS MONSOON METALIZADO', logo: require('./assets/AUDI_A4.png'), reminders: [] },
+  { id: '3', brand: 'BMW', model: 'M440I', plate: 'NGU-364', type: 'AUTOMÓVIL', color: 'GRIS METALIZADO', logo: require('./assets/BMW_M440I.png'), reminders: [] },
+  { id: '4', brand: 'BMW', model: 'X5 XDRIVE45E', plate: 'JMZ-402', type: 'CAMIONETA', color: 'BLANCO MINERAL METALIZADO', logo: require('./assets/BMW_X5.png'), reminders: [] },
+  { id: '5', brand: 'BMW', model: 'X1 SDRIVE20I', plate: 'LKR-728', type: 'CAMIONETA', color: 'AZUL METALIZADO', logo: require('./assets/BMW_X1BLUE.png'), reminders: [] },
+  { id: '6', brand: 'BMW', model: 'X1 SDRIVE20I', plate: 'LKT-908', type: 'CAMIONETA', color: 'NEGRO METALIZADO', logo: require('./assets/BMW_X1BLACK.png'), reminders: [] },
+  { id: '7', brand: 'Mercedes Benz', model: 'E 220', plate: 'MSO-965', type: 'AUTOMÓVIL', color: 'AZUL CAVANISTA METALIZADO', logo: require('./assets/MERCEDES_E220.png'), reminders: [] },
+  { id: '8', brand: 'Mercedes Benz', model: 'GLE 250 D 4MATIC', plate: 'JCQ-665', type: 'CAMIONETA', color: 'MARRON CITRINA METALIZADO', logo: require('./assets/MERCEDES_GLE250.png'), reminders: [] },
+];
+
+const Stack = createStackNavigator();
+
+const ShinyButton = ({ onPress, title }) => (
+  <Animatable.View animation="pulse" easing="ease-out" iterationCount="infinite" style={styles.shinyButton}>
+    <TouchableOpacity onPress={onPress}>
+      <Text style={styles.buttonText}>{title}</Text>
+    </TouchableOpacity>
+  </Animatable.View>
+);
+
+function HomeScreen({ navigation }) {
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicles, setSelectedVehicles] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  useEffect(() => {
+    const loadVehicles = async () => {
+      try {
+        const storedVehicles = await AsyncStorage.getItem('vehicles');
+        if (storedVehicles !== null) {
+          setVehicles(JSON.parse(storedVehicles));
+        } else {
+          setVehicles(initialVehicles);
+        }
+      } catch (error) {
+        console.error('Error loading vehicles from AsyncStorage', error);
+        Alert.alert('Error', 'Hubo un problema cargando los vehículos. Por favor, intenta nuevamente.');
+        setVehicles(initialVehicles);
+      }
+    };
+    loadVehicles();
+  }, []);
+
+  const saveVehicles = async (vehicles) => {
+    try {
+      await AsyncStorage.setItem('vehicles', JSON.stringify(vehicles));
+    } catch (error) {
+      console.error('Error saving vehicles to AsyncStorage', error);
+      Alert.alert('Error', 'Hubo un problema guardando los vehículos. Por favor, intenta nuevamente.');
+    }
+  };
+
+  const toggleVehicleSelection = (id) => {
+    setSelectedVehicles((prevSelected) => {
+      const updatedSelection = new Set(prevSelected);
+      if (updatedSelection.has(id)) {
+        updatedSelection.delete(id);
+      } else {
+        updatedSelection.add(id);
+      }
+      return Array.from(updatedSelection);
+    });
+  };
+
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+    setSelectedVehicles([]);
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Confirmar Eliminación',
+      '¿Estás seguro de que quieres eliminar los vehículos seleccionados?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          onPress: () => {
+            const updatedVehicles = vehicles.filter((vehicle) => !selectedVehicles.includes(vehicle.id));
+            setSelectedVehicles([]);
+            setIsEditMode(false);
+            setVehicles(updatedVehicles);
+            saveVehicles(updatedVehicles);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const CheckBox = ({ isChecked, id }) => (
+    <TouchableOpacity style={styles.checkbox} onPress={() => toggleVehicleSelection(id)}>
+      {isChecked && <Text>X</Text>}
+    </TouchableOpacity>
+  );
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.item, selectedVehicles.includes(item.id) && styles.selectedItem]}
+      onPress={() => {
+        if (isEditMode) {
+          toggleVehicleSelection(item.id);
+        } else {
+          navigation.navigate('Details', { vehicle: item });
+        }
+      }}
+      onLongPress={() => toggleEditMode()}
+    >
+      {isEditMode && <CheckBox isChecked={selectedVehicles.includes(item.id)} id={item.id} />}
+      <View style={styles.itemContent}>
+        <Image source={item.logo} style={styles.vehicleLogo} />
+        <View>
+          <Text style={styles.title}>{`${item.brand} ${item.model}`}</Text>
+          <Text style={styles.subtitle}>{item.plate}</Text>
+          
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <ImageBackground source={require('./assets/LOGOS_VEHICLES.png')} style={styles.backgroundImage}>
+      <View style={styles.overlay}>
+              {isEditMode && (
+          <View style={styles.toolbar}>
+            <ShinyButton title="Eliminar" onPress={handleDelete} />
+          </View>
+        )}
+        <Text style={styles.header}>Vehicle Manager</Text>
+        <FlatList
+          data={vehicles}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+        />
+      </View>
+    </ImageBackground>
+  );
+}
+
+function DetailsScreen({ route, navigation }) {
+  const { vehicle } = route.params;
+  const [modalVisible, setModalVisible] = useState(false);
+  const [reminderEvent, setReminderEvent] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [location, setLocation] = useState('');
+  const [priority, setPriority] = useState('Normal');
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+
+  const addReminder = (event, start, end, location, priority) => {
+    const newReminder = {
+      id: Date.now().toString(),
+      event,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      location,
+      priority,
+    };
+    const updatedReminders = [...vehicle.reminders, newReminder];
+    vehicle.reminders = updatedReminders;
+    setModalVisible(false);
+    saveReminders(updatedReminders);
+  };
+  
+  const saveReminders = async (updatedReminders) => {
+    try {
+      const storedVehicles = await AsyncStorage.getItem('vehicles');
+      let vehicles = storedVehicles ? JSON.parse(storedVehicles) : [];
+      vehicles = vehicles.map((v) => (v.id === vehicle.id ? { ...v, reminders: updatedReminders } : v));
+      await AsyncStorage.setItem('vehicles', JSON.stringify(vehicles));
+    } catch (error) {
+      console.error('Error saving reminders to AsyncStorage', error);
+    }
+  };
+
+  const handleStartDateChange = (selectedDate) => {
+    const currentDate = selectedDate || startDate;
+    setShowStartDatePicker(false);
+    setStartDate(currentDate);
+  };
+
+  const handleEndDateChange = (selectedDate) => {
+    const currentDate = selectedDate || endDate;
+    setShowEndDatePicker(false);
+    setEndDate(currentDate);
+  };
+
+  return (
+    <Animatable.View animation="fadeInUp" duration={800} style={styles.container}>
+      <ImageBackground source={vehicle.logo} style={styles.backgroundImage}>
+        <View style={styles.overlay}>
+          <Text style={styles.header}>{`${vehicle.brand} ${vehicle.model}`}</Text>
+          <Text style={styles.subtitle}>Placa: {vehicle.plate}</Text>
+          <Text style={styles.detail}>Color: {vehicle.color}</Text>
+          <Text style={styles.detail}>Tipo: {vehicle.type}</Text>
+          <TouchableOpacity style={styles.reminderButton} onPress={() => setModalVisible(true)}>
+          <ShinyButton title="Añadir Recordatorio" onPress={() => setModalVisible(true)} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.reminderButton} onPress={() => navigation.navigate('RemindersList', { vehicle })}>
+          <ShinyButton title="Ver Recordatorios" onPress={() => navigation.navigate('RemindersList', { vehicle })} />
+          </TouchableOpacity>
+        </View>
+
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.centeredView}>
+            <View style={styles.modalView}>
+              <Text style={styles.modalText}>Fecha de inicio:</Text>
+              <TouchableOpacity onPress={() => setShowStartDatePicker(true)} style={styles.input}>
+                <Text style={styles.inputText}>{startDate.toDateString()}</Text>
+              </TouchableOpacity>
+              {showStartDatePicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleStartDateChange}
+                />
+              )}
+              <Text style={styles.modalText}>Fecha final:</Text>
+              <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={styles.input}>
+                <Text style={styles.inputText}>{endDate.toDateString()}</Text>
+              </TouchableOpacity>
+              {showEndDatePicker && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleEndDateChange}
+                />
+              )}
+              <Text style={styles.modalText}>Evento:</Text>
+              <TextInput
+                style={styles.input}
+                onChangeText={(text) => setReminderEvent(text)}
+                value={reminderEvent}
+                placeholder="Ingrese el evento"
+              />
+              <Text style={styles.modalText}>Lugar:</Text>
+              <TextInput
+                style={styles.input}
+                onChangeText={(text) => setLocation(text)}
+                value={location}
+                placeholder="Ingrese el lugar"
+              />
+              <Text style={styles.modalText}>Prioridad:</Text>
+              <Picker
+                selectedValue={priority}
+                style={styles.input}
+                onValueChange={(itemValue) => setPriority(itemValue)}
+              >
+                <Picker.Item label="Baja" value="Baja" />
+                <Picker.Item label="Normal" value="Normal" />
+                <Picker.Item label="Alta" value="Alta" />
+              </Picker>
+              <View style={styles.modalButtonContainer}>
+                <Button title="Aceptar" onPress={() => addReminder(reminderEvent, startDate, endDate, location, priority)} />
+                <Button title="Cancelar" onPress={() => setModalVisible(false)} />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </ImageBackground>
+    </Animatable.View>
+  );
+}
+
+function RemindersListScreen({ route, navigation }) {
+  const { vehicle } = route.params;
+  const [reminders, setReminders] = useState(vehicle.reminders);
+  const [selectedReminders, setSelectedReminders] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const toggleReminderSelection = (id) => {
+    setSelectedReminders((prevSelected) => {
+      const updatedSelection = new Set(prevSelected);
+      if (updatedSelection.has(id)) {
+        updatedSelection.delete(id);
+      } else {
+        updatedSelection.add(id);
+      }
+      return Array.from(updatedSelection);
+    });
+  };
+
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+    setSelectedReminders([]);
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Confirmar Eliminación',
+      '¿Estás seguro de que quieres eliminar los recordatorios seleccionados?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          onPress: () => {
+            const updatedReminders = reminders.filter((reminder) => !selectedReminders.includes(reminder.id));
+            setSelectedReminders([]);
+            setIsEditMode(false);
+            setReminders(updatedReminders);
+            saveReminders(updatedReminders);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const saveReminders = async (updatedReminders) => {
+    try {
+      const storedVehicles = await AsyncStorage.getItem('vehicles');
+      let vehicles = storedVehicles ? JSON.parse(storedVehicles) : [];
+      vehicles = vehicles.map((v) => (v.id === vehicle.id ? { ...v, reminders: updatedReminders } : v));
+      await AsyncStorage.setItem('vehicles', JSON.stringify(vehicles));
+    } catch (error) {
+      console.error('Error saving reminders to AsyncStorage', error);
+    }
+  };
+
+  const CheckBox = ({ isChecked, id }) => (
+    <TouchableOpacity style={styles.checkbox} onPress={() => toggleReminderSelection(id)}>
+      {isChecked && <Text>X</Text>}
+    </TouchableOpacity>
+  );
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      style={[styles.item, selectedReminders.includes(item.id) && styles.selectedItem]}
+      onPress={() => {
+        if (isEditMode) {
+          toggleReminderSelection(item.id);
+        }
+      }}
+      onLongPress={() => toggleEditMode()}
+    >
+      {isEditMode && <CheckBox isChecked={selectedReminders.includes(item.id)} id={item.id} />}
+      <View style={styles.itemContent}>
+        <Text style={styles.title}>{item.event}</Text>
+        <Text style={styles.subtitle}>{`${item.start} - ${item.end}`}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <ImageBackground source={require('./assets/LOGOS_VEHICLES.png')} style={styles.backgroundImage}>
+      <View style={styles.overlay}>
+        {isEditMode && (
+          <View style={styles.toolbar}>
+            <Button title="Eliminar" onPress={handleDelete} />
+          </View>
+        )}
+        <Text style={styles.header}>Lista de Recordatorios</Text>
+        <FlatList
+          data={reminders}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+        />
+      </View>
+    </ImageBackground>
+  );
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          headerShown: true,
+          cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+        }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Details" component={DetailsScreen} />
+        <Stack.Screen name="RemindersList" component={RemindersListScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1c1c1e', // Fondo oscuro
+  },
+  backgroundImage: {
+    flex: 1,
+    resizeMode: 'cover',
+    justifyContent: 'center',
+  },
+  overlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffd700',
+    marginBottom: 10,
+  },
+  
+  subtitle: {
+    fontSize: 18,
+    color: '#dcdcdc',
+  },
+  detail: {
+    fontSize: 16,
+    color: '#dcdcdc',
+    marginBottom: 5,
+  },
+  reminderButton: {
+    backgroundColor: '#8b0000',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  reminderButtonText: {
+    color: '#ffd700',
+    fontWeight: 'bold',
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: '#2f2f2f',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20,
+  },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalText: {
+    marginBottom: 15,
+    textAlign: 'center',
+    color: '#dcdcdc',
+  },
+  input: {
+    height: 40,
+    borderColor: '#555',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+    width: 200,
+    color: '#fff',
+    backgroundColor: '#1c1c1e',
+  },
+  item: {
+    backgroundColor: '#2f2f2f',
+    padding: 20,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedItem: {
+    backgroundColor: '#8b0000',
+  },
+  itemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  vehicleLogo: {
+    width: 50,
+    height: 50,
+    marginRight: 10,
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  reminderItem: {
+    backgroundColor: '#2f2f2f',
+    padding: 20,
+    marginVertical: 8,
+    marginHorizontal: 16,
+    borderRadius: 10,
+    borderColor: '#ffd700',
+    borderWidth: 1,
+  },
+  reminderItemDate: {
+    fontSize: 14,
+    color: '#aaa',
+    marginTop: 5,
+  },
+  reminderSeparator: {
+    height: 1,
+    backgroundColor: '#ffd700',
+    marginVertical: 8,
+  },
+  reminderHeader: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffd700',
+    marginBottom: 10,
+  },
+  reminderSubheader: {
+    fontSize: 18,
+    color: '#dcdcdc',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#fff',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toolbar:  {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 10,
+  },
+  shinyButton: {
+    backgroundColor: '#ff4500',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+    elevation: 3,
+  },
+  button: {
+    backgroundColor: '#1c1c1e',
+    borderColor: '#ffd700',
+    borderWidth: 2,
+    borderRadius: 5,
+    padding: 10,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  buttonPressed: {
+    backgroundColor: '#ffcc00', // Dorado brillante
+  },
+  inputText: {
+    color: '#fff',
+  },
+  buttonText: {
+    color: '#1c1c1e',
+    fontWeight: 'bold',
+  },
+});
