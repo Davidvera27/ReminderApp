@@ -186,6 +186,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20, // Añade padding inferior para asegurarse de que todos los elementos sean visibles
   },
+  
 });
 
 export default styles; // Exporta el objeto de estilos

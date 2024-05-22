@@ -64,7 +64,7 @@ function DetailsScreen({ route, navigation }) {
 
   // Maneja el cambio de la fecha de inicio.
   const handleStartDateChange = (selectedDate) => {
-    const currentDate = selectedDate || startDate; // Usa la fecha seleccionada o la fecha actual.
+    if (selectedDate) setStartDate(selectedDate); // Usa la fecha seleccionada o la fecha actual.
     setShowStartDatePicker(false); // Oculta el selector de fecha de inicio.
     setStartDate(currentDate); // Actualiza el estado de la fecha de inicio.
   };
